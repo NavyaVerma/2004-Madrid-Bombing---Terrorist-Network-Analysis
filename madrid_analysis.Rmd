@@ -1,0 +1,190 @@
+---
+title: "Network Analysis of the 2004 Madrid Train Bombing"
+author: "Jered Sanchez"
+date: "February 5, 2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+# Load packages
+library(tidyverse)
+library(igraph)
+library(ggraph)
+
+# Read the nodes file into the variable nodes
+nodes <- read_csv("data/nodes.csv")
+
+# Read the ties file into the variable ties
+ties <- read_csv("data/ties.csv")
+
+# Make the network from the data frame ties and print it
+g <- graph_from_data_frame(ties, directed = FALSE, vertices = nodes)
+#g
+
+# Give the name "Madrid network" to the network 
+g$name <- "Madrid network"
+#g$name
+
+# Add node attribute id and print the node `id` attribute
+V(g)$id <- seq(1, vcount(g))
+
+
+```
+
+
+## Madrid Terrorist Relationship Network
+
+The analysis begins with transforming the data from the files provided into a graph object consisting of nodes and ties, in this case nodes represent terrorists in the network and ties the relationship strenghts between them.
+
+Showing the basic attributes of the network below, we see there are 64 nodes and 243 relationships between them:
+
+```{r}
+# Explore the set of nodes
+V(g)
+
+# Print the number of nodes
+
+vcount(g)
+
+# Explore the set of ties
+E(g)
+
+# Print the number of ties
+ecount(g)
+
+```
+
+## Initial Data Visualization
+
+Once we have a general idea of the data and structure of the graph, we can begin to visualize the network. This network has a typical core-periphery structure, with a densely knitted center and a sparser periphery around it.
+
+
+
+``` {r, echo = FALSE, warning=FALSE}
+
+# Visualize the network with the Kamada-Kawai layout 
+ggraph(g, layout = "with_kk") + 
+  # Add an edge link geometry mapping transparency to weight 
+  geom_edge_link(aes(alpha = weight)) + 
+  # Add a node point geometry
+  geom_node_point() +
+  # Add a node text geometry, mapping label to id and repelling
+  geom_node_text(aes(label = id), repel = TRUE)
+
+# The network has a typical core-periphery structure, with a densely knitted center and a sparser periphery around it.
+
+```
+
+Circular network layout
+
+
+```{r, echo=FALSE, warning=FALSE}
+# Visualize the network in a circular layout
+ggraph(g, layout = "in_circle") + 
+  # Map tie transparency to its weight
+  geom_edge_link(aes(alpha = weight)) + 
+  geom_node_point()
+```
+
+
+Grid network layout
+
+```{r, echo = FALSE, warning=FALSE}
+# Visualize the network in a grid layout
+ggraph(g, layout = "on_grid") + 
+  # Map tie transparency to its weight
+  geom_edge_link(aes(alpha = weight)) + 
+  geom_node_point()
+```
+
+## Network Centrality Measures
+
+
+
+We can look for the most connected terrorists of the train bombing network using degree centrality. The ranking leader, Jamal Zougam, was in fact directly involved in the bombings and was one of the first to be arrested.
+```{r, echo=FALSE, warning=FALSE}
+nodes_with_centrality <- nodes %>%
+  # Add a column containing the degree of each node
+  mutate(degree = degree(g)) %>%
+  # Arrange rows by descending degree
+  arrange(desc(degree))
+
+# See the result
+nodes_with_centrality
+
+```
+
+Several other measures of network centrality can be helpful for analysis. In the following table tie strength, betweenness, and closeness are included. 
+
+### Tie Betweenness
+
+Ties with high betweenness may have considerable influence within a network by virtue of their control over information passing between nodes. Removing them will most disrupt communication between nodes.
+
+
+
+``` {r, echo = FALSE, warning=FALSE}
+nodes_with_centrality <- nodes %>%
+  mutate(
+    degree = degree(g),
+    # Add a column containing the strength of each node
+    strength = strength(g)
+  ) %>%
+  # Arrange rows by descending strength
+  arrange(desc(strength))
+
+# Add betweenness and closeness
+
+nodes_with_centrality <- nodes %>%
+  mutate(
+    degree = degree(g),
+    # Add a column containing the strength of each node
+    strength = strength(g),
+    betweenness = betweenness(g),
+    closeness = closeness(g)
+  ) %>%
+  # Arrange rows by descending strength
+  arrange(desc(closeness))
+
+# See the result
+nodes_with_centrality
+```
+
+## Final Data Visualization
+
+Once we have an idea of how the network behaves, and the key targets within the network, we can search and visualize the data interactively. This feature allows us to single out a target by selecting the node itself or by the dropdown selector box. You can scoll up and down to zoom on the graph and see the node names.
+
+```{r, echo = FALSE, warning=FALSE}
+
+############################
+# Interactive vizualizations
+############################
+
+# Load visNetwork
+library(visNetwork)
+
+# Convert from igraph to visNetwork
+data <- toVisNetworkData(g)
+
+visNetwork(nodes = data$nodes, edges = data$edges) %>%
+  # Change the layout to be KK
+  visIgraphLayout(layout = "layout_with_kk") %>%
+  # Change the options to highlight the nearest nodes and ties
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE)
+  
+
+```
+
+
+
+
+
+
